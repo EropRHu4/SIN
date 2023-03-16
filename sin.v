@@ -16,58 +16,33 @@
 `define ARG_TOTAL_BITS ( `ARG_SIGNED + `ARG_INT_PART_BITS + `ARG_FRAC_PART_BITS )
 
 //Result derived constants
-`define RES_TOTAL_BITS (`RES_SIGNED + `RES_INT_PART_BITS + `RES_FRAC_PART_BITS) 
+`define RES_TOTAL_BITS (`RES_SIGNED + `RES_INT_PART_BITS + `RES_FRAC_PART_BITS ) 
 `define RES_SIGN_BIT_MASK (`RES_SIGNED ? 1 << (`RES_TOTAL_BITS - 1) : 0) 
  
 `define APR_TOTAL_BITS (`ARG_TOTAL_BITS + `DIFF_BITS)
  
  //
-`define CHISL 1 << `DIFF_BITS
+`define CHISL (1 << 2) //`DIFF_BITS
 `define INDEX0 (x >> `DIFF_BITS)
 `define INDEX1 ((x >> `DIFF_BITS) + 1)
 `define SIGN_MASK (1 << 31)
 `define LONG_MASK (`SIGN_MASK - 1)
 
+///// SLAG1
 
-//`define SLAG1 (           ({30'b0, {x[1 : 0]}})  * ( (sin_table[`INDEX0] & 16'h8000) ? ( (sin_table[`INDEX0] & ~`RES_SIGN_BIT_MASK ) | `SIGN_MASK ) : sin_table[`INDEX0] ) )
-`define SLAG1 ( (`CHISL - ({30'b0, {x[1 : 0]}})) * ( (sin_table[`INDEX0] & 16'h8000) ? ( (sin_table[`INDEX0] & ~`RES_SIGN_BIT_MASK ) | `SIGN_MASK ) : sin_table[`INDEX0] ) )
-//`define SLAG1 ( ( (sin_table[`INDEX0] & 16'h8000) ? ( ((sin_table[`INDEX0] & ~`RES_SIGN_BIT_MASK ) * (`CHISL - ({30'b0, {x[1 : 0]}}))) | `SIGN_MASK ) : (sin_table[`INDEX0] * (`CHISL - ({30'b0, {x[1 : 0]}}))) ) )
+`define reminder ({30'b0, {x[1 : 0]}})
+`define y1Coeff (`CHISL - `reminder)
+`define y1Neg (sin_table[`INDEX0] & `RES_SIGN_BIT_MASK)
 
-`define SLAG2 ( ({30'b0, {x[1 : 0]}}) * ( (sin_table[`INDEX1] & 16'h8000) ? ( (sin_table[`INDEX1] & ~`RES_SIGN_BIT_MASK ) | `SIGN_MASK ) : sin_table[`INDEX1] ) )
-//`define SLAG2 ( ( (sin_table[`INDEX1] & 16'h8000) ? ( ((sin_table[`INDEX1] & ~`RES_SIGN_BIT_MASK ) * ({30'b0, {x[1 : 0]}})) | `SIGN_MASK ) : sin_table[`INDEX1] ) )
+////// SLAG2
+`define y2Coeff (`reminder)
+`define y2Neg (sin_table[`INDEX1] & `RES_SIGN_BIT_MASK)
+
+`define SLAG1 ( (`y1Neg != 0) ? ( ((sin_table[`INDEX0] & (~`RES_SIGN_BIT_MASK) ) * `y1Coeff ) | `SIGN_MASK ) : ( sin_table[`INDEX0] * `y1Coeff) )
+`define SLAG2 ( (`y2Neg != 0) ? ( ((sin_table[`INDEX1] & (~`RES_SIGN_BIT_MASK) ) * `y2Coeff ) | `SIGN_MASK ) : ( sin_table[`INDEX1] * `y2Coeff) ) 
 
 
 module sin 
-/*#( 
-
-parameter ARG_TOTAL_BITS = `ARG_SIGNED + `ARG_INT_PART_BITS + `ARG_FRAC_PART_BITS, 
-parameter ARG_SIGN_BIT_MASK = `ARG_SIGNED ? 1 << (ARG_TOTAL_BITS - 1) : 0, 
-parameter ARG_FRACT_HI_BIT = (1 << (`ARG_FRAC_PART_BITS - 1)), 
-parameter ARG_FRACT_MASK = (1 << `ARG_FRAC_PART_BITS) - 1, 
-parameter ARG_VALUES_COUNT = 1 << (ARG_TOTAL_BITS - 1), // -1 ???
-parameter ARG_TOTAL_BITS_MASK = ARG_VALUES_COUNT -1, 
- 
-/////////////////////////// RES ///////////////////////////// 
-
-parameter RES_FRACT_HI_BIT = (1 << (`RES_FRAC_PART_BITS - 1)), 
-parameter RES_FRACT_MASK = (1 << `RES_FRAC_PART_BITS) - 1, 
-parameter RES_VALUES_COUNT = 1 << `RES_TOTAL_BITS, 
-parameter RES_TOTAL_BITS_MASK = RES_VALUES_COUNT -1, 
- 
-/////////////////////////// Approx ///////////////////////////// 
-parameter APR_SIGNED = `ARG_SIGNED, 
-parameter APR_INT_PART_BITS = `ARG_INT_PART_BITS, 
-parameter APR_FRAC_PART_BITS = `ARG_FRAC_PART_BITS + `DIFF_BITS, 
-
- // -2???
-parameter APR_SIGN_BIT_MASK = APR_SIGNED ? 1 << (`APR_TOTAL_BITS - 1) : 0, 
-parameter APR_FRACT_HI_BIT = (1 << (APR_FRAC_PART_BITS - 1)), 
-parameter APR_FRACT_MASK = (1 << APR_FRAC_PART_BITS) - 1, 
-parameter APR_VALUES_COUNT = 1 << `APR_TOTAL_BITS, 
-parameter APR_TOTAL_BITS_MASK = APR_VALUES_COUNT -1
-
-/////////////////////////////////////////////////////////////// 
-) */
 (  
  
 input                                   clk,  
@@ -127,9 +102,7 @@ always @(posedge clk) begin
             end 
         end 
     end 
-    sin <= s[31] ? ((s >> `DIFF_BITS) |/*`SIGN_MASK*/`RES_SIGN_BIT_MASK) : (s >> `DIFF_BITS);
+    sin <= s[31] ? ((s >> `DIFF_BITS) | `RES_SIGN_BIT_MASK) : (s >> `DIFF_BITS);
 end 
 
 endmodule
-
-
